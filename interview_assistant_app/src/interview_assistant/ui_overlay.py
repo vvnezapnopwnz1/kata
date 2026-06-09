@@ -238,18 +238,48 @@ class OverlayWindow(QWidget):
         # 4. Header Row: Transcript and Status
         self.header_row_layout = QHBoxLayout()
         
+        # Transcript Scroll Area (restricted height)
+        self.transcript_scroll = QScrollArea()
+        self.transcript_scroll.setWidgetResizable(True)
+        self.transcript_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.transcript_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.transcript_scroll.setMaximumHeight(70)
+        self.transcript_scroll.setStyleSheet("""
+            QScrollArea {
+                background-color: rgba(30, 30, 35, 180); 
+                border-radius: 6px;
+                border: 1px solid rgba(255, 255, 255, 15);
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: transparent;
+                width: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 30);
+                min-height: 10px;
+                border-radius: 2px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+        """)
+        
         # Transcript Label (Live STT)
         self.transcript_label = QLabel("Transcript: [Speech will appear here]")
         self.transcript_label.setStyleSheet("""
             color: #94A3B8; 
             font-size: 13px; 
             font-style: italic; 
-            background-color: rgba(30, 30, 35, 180); 
-            padding: 8px 12px; 
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 15);
+            background: transparent;
+            border: none;
+            padding: 6px 10px; 
         """)
         self.transcript_label.setWordWrap(True)
+        self.transcript_scroll.setWidget(self.transcript_label)
         
         # Status Label
         self.status_label = QLabel("Ready")
@@ -265,8 +295,8 @@ class OverlayWindow(QWidget):
         self.status_label.setFixedWidth(160)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        self.header_row_layout.addWidget(self.transcript_label, 3)
-        self.header_row_layout.addWidget(self.status_label, 1)
+        self.header_row_layout.addWidget(self.transcript_scroll, 3)
+        self.header_row_layout.addWidget(self.status_label, 1, Qt.AlignmentFlag.AlignVCenter)
         self.content_layout.addLayout(self.header_row_layout)
         
         # 5. Scroll Area for TL;DR and Script
@@ -591,3 +621,6 @@ class OverlayWindow(QWidget):
     def set_transcript(self, text: str):
         self.show()
         self.transcript_label.setText(f"Transcript: {text}")
+        # Auto-scroll to the bottom of the transcript scroll area
+        scrollbar = self.transcript_scroll.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
