@@ -75,9 +75,9 @@ def test_llm_pipeline_agent_builder(base_args, mocker):
     
     # Mock requests.post with stream response
     mock_response = mocker.Mock()
-    mock_response.iter_lines.return_value = [
-        b'[',
-        b'  {"outputs": [{"text": "Agent response turn 1"}]},',
+    mock_response.iter_content.return_value = [
+        b'[\n',
+        b'  {\n    "outputs": [\n      {\n        "text": "Agent response turn 1"\n      }\n    ]\n  }\n',
         b']'
     ]
     mocker.patch("requests.post", return_value=mock_response)

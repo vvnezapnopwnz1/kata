@@ -65,31 +65,49 @@ class PlaybookAgentPipeline:
             response.raise_for_status()
             
             import json
-            for line in response.iter_lines():
-                if not line:
+            buffer = []
+            brace_count = 0
+            in_string = False
+            escape = False
+            
+            for chunk in response.iter_content(chunk_size=1024):
+                if not chunk:
                     continue
-                
-                line_str = line.decode('utf-8').strip()
-                # Clean up JSON array elements from Server-Sent Event stream
-                if line_str.startswith('['):
-                    line_str = line_str[1:]
-                if line_str.endswith(']'):
-                    line_str = line_str[:-1]
-                if line_str.endswith(','):
-                    line_str = line_str[:-1]
-                line_str = line_str.strip()
-                
-                if not line_str:
-                    continue
-                    
-                try:
-                    chunk_data = json.loads(line_str)
-                    if "outputs" in chunk_data:
-                        for out in chunk_data["outputs"]:
-                            if "text" in out:
-                                yield out["text"]
-                except Exception as je:
-                    logger.debug(f"Failed to parse streaming line JSON: {je} for line: {line_str}")
+                chunk_str = chunk.decode('utf-8', errors='ignore')
+                for char in chunk_str:
+                    if brace_count > 0:
+                        buffer.append(char)
+                    elif char == '{':
+                        brace_count = 1
+                        buffer = ['{']
+                        in_string = False
+                        escape = False
+                        continue
+                        
+                    if brace_count > 0:
+                        if escape:
+                            escape = False
+                        elif char == '\\':
+                            escape = True
+                        elif char == '"':
+                            in_string = not in_string
+                        elif not in_string:
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    # Complete JSON object detected
+                                    obj_str = "".join(buffer)
+                                    try:
+                                        obj = json.loads(obj_str)
+                                        if "outputs" in obj:
+                                            for out in obj["outputs"]:
+                                                if "text" in out:
+                                                    yield out["text"]
+                                    except Exception as je:
+                                        logger.debug(f"Failed to parse accumulated JSON chunk: {je} for data: {obj_str}")
+                                    buffer = []
             
         except Exception as e:
             logger.error(f"Agent Builder Playbook execution failed: {e}")
