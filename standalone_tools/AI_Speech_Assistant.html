@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go AI Co-Pilot Dashboard</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #060913;
+            --bg-card: rgba(15, 23, 42, 0.65);
+            --bg-card-hover: rgba(30, 41, 59, 0.8);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(16, 185, 129, 0.4);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --accent: #10b981;
+            --accent-glow: rgba(16, 185, 129, 0.15);
+            --accent-hover: #34d399;
+            
+            --danger: #f43f5e;
+            --danger-glow: rgba(244, 63, 94, 0.15);
+            
+            --warning: #fbbf24;
+            --warning-glow: rgba(251, 191, 36, 0.15);
+            
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --ai-font-size: 16px;
+            --sidebar-width: 320px;
+        }
+
+        * {
+            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar Settings */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(10, 15, 30, 0.8);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header i {
+            color: var(--accent);
+            font-size: 28px;
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #ffffff 0%, #a5f3fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setting-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-value {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        input[type="password"], select, textarea {
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            width: 100%;
+            transition: all 0.2s ease;
+            font-family: var(--font-sans);
+        }
+
+        input[type="password"]:focus, select:focus, textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+            outline: none;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Range Input Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Main Workspace */
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-width: 0; /* Prevents flex items from expanding */
+        }
+
+        /* Top control header */
+        .navbar {
+            height: 70px;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 15, 30, 0.4);
+            backdrop-filter: blur(10px);
+        }
+
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-pill {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        /* Status colors */
+        .status-listening {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        .status-listening .status-dot {
+            background-color: var(--accent);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-reconnecting {
+            border-color: var(--warning);
+            color: var(--warning);
+            background: rgba(251, 191, 36, 0.05);
+        }
+        .status-reconnecting .status-dot {
+            background-color: var(--warning);
+            animation: pulse-warn 1.5s infinite;
+        }
+
+        .status-off {
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        @keyframes pulse-warn {
+            0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+        }
+
+        /* Sound Wave Animation */
+        .sound-wave {
+            display: none;
+            align-items: center;
+            gap: 3px;
+            height: 12px;
+        }
+
+        .status-listening .sound-wave {
+            display: flex;
+        }
+
+        .sound-wave span {
+            width: 2px;
+            height: 100%;
+            background-color: var(--accent);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .sound-wave span:nth-child(2) { animation-delay: 0.15s; height: 60%; }
+        .sound-wave span:nth-child(3) { animation-delay: 0.3s; height: 80%; }
+        .sound-wave span:nth-child(4) { animation-delay: 0.1s; height: 40%; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.4); }
+            50% { transform: scaleY(1.2); }
+        }
+
+        .action-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Primary action button */
+        .btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: var(--font-sans);
+        }
+
+        .btn-start {
+            background-color: var(--accent);
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-start:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-stop {
+            background-color: var(--danger);
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(244, 63, 94, 0.3);
+        }
+
+        .btn-stop:hover {
+            background-color: #fb7185;
+            transform: translateY(-1px);
+        }
+
+        .btn-ai {
+            background-color: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+        }
+
+        .btn-ai:hover {
+            background-color: rgba(99, 102, 241, 0.25);
+            border-color: rgba(99, 102, 241, 0.5);
+            color: #ffffff;
+        }
+
+        .btn-secondary {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* Main panels layout */
+        .panels-container {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            min-height: 0; /* Critical for layout overflow */
+        }
+
+        .card {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            min-width: 0; /* Allows shrinking */
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 12px;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title i {
+            color: var(--accent);
+            font-size: 20px;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        /* Panel content boxes */
+        .content-box {
+            flex: 1;
+            overflow-y: auto;
+            border-radius: 10px;
+            background-color: rgba(5, 8, 16, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 16px;
+            font-size: 15px;
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        /* Editable Transcript Box */
+        #transcript {
+            color: var(--text-primary);
+            outline: none;
+            white-space: pre-wrap;
+        }
+        
+        #transcript:focus {
+            border-color: var(--border-focus);
+            box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.03);
+        }
+
+        .interim-text {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .empty-placeholder {
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            font-style: italic;
+            font-size: 14px;
+        }
+
+        /* AI Suggestion Box Styling */
+        #ai-response {
+            font-size: var(--ai-font-size);
+            color: #c7f284; /* Soft bright green/yellow for high contrast readability */
+            line-height: 1.5;
+            transition: font-size 0.2s ease;
+        }
+
+        /* Markdown rendered elements inside AI Response */
+        #ai-response h1, #ai-response h2, #ai-response h3 {
+            color: #ffffff;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        #ai-response h3 {
+            font-size: 1.1em;
+            border-left: 3px solid var(--accent);
+            padding-left: 8px;
+        }
+
+        #ai-response ul, #ai-response ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        #ai-response li {
+            margin-bottom: 6px;
+        }
+
+        #ai-response strong {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        /* Code Block Design */
+        #ai-response pre {
+            background-color: #0b0f19;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 12px 14px;
+            overflow-x: auto;
+            margin: 12px 0;
+            position: relative;
+        }
+
+        #ai-response code {
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+            color: #38bdf8; /* Soft blue for Go code */
+            background-color: rgba(56, 189, 248, 0.08);
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        #ai-response pre code {
+            color: #38bdf8;
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+            display: block;
+            line-height: 1.5;
+        }
+
+        /* Copy Button inside Code Block */
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transition: all 0.2s ease;
+            font-family: var(--font-sans);
+        }
+
+        #ai-response pre:hover .copy-btn {
+            opacity: 1;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .copy-btn.copied {
+            background: #047857;
+            color: white;
+            border-color: #047857;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Settings Panel -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="material-icons-round">radar</i>
+            <h1>Co-Pilot Settings</h1>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Gemini API Key</span>
+            </div>
+            <input type="password" id="gemini-key" placeholder="AI Studio API Key...">
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Модель ИИ</span>
+            </div>
+            <select id="gemini-model">
+                <option value="gemini-2.5-flash">gemini-2.5-flash (Fastest)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Шрифт подсказки</span>
+                <span class="setting-value" id="font-size-val">16px</span>
+            </div>
+            <input type="range" id="font-size-slider" min="12" max="32" value="16">
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Глубина истории (мин)</span>
+                <span class="setting-value" id="history-len-val">2 мин</span>
+            </div>
+            <input type="range" id="history-len-slider" min="1" max="5" value="2">
+        </div>
+
+        <div class="setting-group" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="setting-label">
+                <span>Системный Промпт</span>
+                <span class="icon-btn" id="reset-prompt-btn" title="Сбросить промпт"><i class="material-icons-round" style="font-size: 16px;">restart_alt</i></span>
+            </div>
+            <textarea id="system-prompt" style="flex: 1; min-height: 150px;"></textarea>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+        <!-- Top Navbar -->
+        <div class="navbar">
+            <div class="status-container">
+                <div class="status-pill status-off" id="status-pill">
+                    <span class="status-dot"></span>
+                    <span id="status-text">СТАТУС: ВЫКЛ</span>
+                    <div class="sound-wave">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-group">
+                <button class="btn btn-secondary" id="clear-btn">
+                    <i class="material-icons-round">delete_outline</i>
+                    Сбросить
+                </button>
+                <button class="btn btn-ai" id="ask-btn">
+                    <i class="material-icons-round">bolt</i>
+                    Спросить ИИ (Alt+S)
+                </button>
+                <button class="btn btn-start" id="start-btn">
+                    <i class="material-icons-round">play_arrow</i>
+                    <span id="start-btn-text">Старт</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Panels Layout -->
+        <div class="panels-container">
+            <!-- Left panel: Speech Transcript (Editable) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="material-icons-round">hearing</i>
+                        Диалог (С возможностью правки)
+                    </h2>
+                    <div class="card-actions">
+                        <button class="icon-btn" id="edit-transcript-info" title="Вы можете кликнуть в текст и отредактировать опечатки распознавания перед запросом к ИИ">
+                            <i class="material-icons-round">info</i>
+                        </button>
+                    </div>
+                </div>
+                <div class="content-box" id="transcript" contenteditable="true" placeholder="Нажмите кнопку 'Старт' и говорите..."></div>
+            </div>
+
+            <!-- Right panel: AI Suggestions -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="material-icons-round">smart_toy</i>
+                        Шпаргалка ИИ (Go Co-Pilot)
+                    </h2>
+                    <div class="card-actions">
+                        <button class="icon-btn" id="copy-suggestion-btn" title="Копировать всю шпаргалку">
+                            <i class="material-icons-round">content_copy</i>
+                        </button>
+                    </div>
+                </div>
+                <div class="content-box" id="ai-response">ИИ готов к генерации подсказок...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const startBtnText = document.getElementById('start-btn-text');
+        const askBtn = document.getElementById('ask-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        
+        const statusPill = document.getElementById('status-pill');
+        const statusText = document.getElementById('status-text');
+        
+        const transcriptDiv = document.getElementById('transcript');
+        const aiResponseDiv = document.getElementById('ai-response');
+        
+        const keyInput = document.getElementById('gemini-key');
+        const modelSelect = document.getElementById('gemini-model');
+        const fontSizeSlider = document.getElementById('font-size-slider');
+        const fontSizeVal = document.getElementById('font-size-val');
+        const historySlider = document.getElementById('history-len-slider');
+        const historyVal = document.getElementById('history-len-val');
+        const promptTextarea = document.getElementById('system-prompt');
+        const resetPromptBtn = document.getElementById('reset-prompt-btn');
+        const copySuggestionBtn = document.getElementById('copy-suggestion-btn');
+
+        // Defaults
+        const DEFAULT_PROMPT = `Ты - опытный Go-разработчик. На вход тебе поступает транскрипция разговора с технического собеседования.
+Определи последний заданный технический вопрос (даже если он прерван или нечеткий) и напиши КРАТКУЮ ШПАРАГАЛКУ для устного ответа:
+1. **Суть ответа:** 2-3 предложения для старта ("Простыми словами...").
+2. **Важнейшие детали Go (Буллиты):** Упомяни 3-4 ключевых момента под капотом (например, GMP планировщик, mutex vs channels, аллокации в куче/стеке, устройство слайсов).
+3. **Мини-пример (до 5 строк):** Если уместно, покажи синтаксический паттерн Go.
+
+Пиши емко. Избегай размытых фраз. Сделай текст легко читаемым краем глаза за 5 секунд.`;
+
+        let recognition = null;
+        let isListening = false;
+        let shouldBeListening = false; // Controls intentional state vs auto-restart
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        // Cache management
+        function loadSettings() {
+            if (localStorage.getItem('gemini_api_key')) {
+                keyInput.value = localStorage.getItem('gemini_api_key');
+            }
+            if (localStorage.getItem('gemini_model')) {
+                modelSelect.value = localStorage.getItem('gemini_model');
+            }
+            if (localStorage.getItem('font_size')) {
+                const fs = localStorage.getItem('font_size');
+                fontSizeSlider.value = fs;
+                fontSizeVal.textContent = fs + 'px';
+                aiResponseDiv.style.setProperty('--ai-font-size', fs + 'px');
+            }
+            if (localStorage.getItem('history_len')) {
+                const hl = localStorage.getItem('history_len');
+                historySlider.value = hl;
+                historyVal.textContent = hl + ' мин';
+            }
+            if (localStorage.getItem('system_prompt')) {
+                promptTextarea.value = localStorage.getItem('system_prompt');
+            } else {
+                promptTextarea.value = DEFAULT_PROMPT;
+            }
+        }
+
+        loadSettings();
+
+        // Listeners for save
+        keyInput.addEventListener('change', () => localStorage.setItem('gemini_api_key', keyInput.value));
+        modelSelect.addEventListener('change', () => localStorage.setItem('gemini_model', modelSelect.value));
+        promptTextarea.addEventListener('change', () => localStorage.setItem('system_prompt', promptTextarea.value));
+        
+        fontSizeSlider.addEventListener('input', (e) => {
+            const fs = e.target.value;
+            fontSizeVal.textContent = fs + 'px';
+            aiResponseDiv.style.setProperty('--ai-font-size', fs + 'px');
+            localStorage.setItem('font_size', fs);
+        });
+
+        historySlider.addEventListener('input', (e) => {
+            const hl = e.target.value;
+            historyVal.textContent = hl + ' мин';
+            localStorage.setItem('history_len', hl);
+        });
+
+        resetPromptBtn.addEventListener('click', () => {
+            if (confirm("Сбросить промпт на дефолтный?")) {
+                promptTextarea.value = DEFAULT_PROMPT;
+                localStorage.setItem('system_prompt', DEFAULT_PROMPT);
+            }
+        });
+
+        // Copy functionality
+        copySuggestionBtn.addEventListener('click', () => {
+            const range = document.createRange();
+            range.selectNode(aiResponseDiv);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            try {
+                document.execCommand('copy');
+                copySuggestionBtn.innerHTML = '<i class="material-icons-round" style="color: var(--accent);">done</i>';
+                setTimeout(() => {
+                    copySuggestionBtn.innerHTML = '<i class="material-icons-round">content_copy</i>';
+                }, 1500);
+            } catch (err) {
+                console.error("Could not copy text: ", err);
+            }
+            window.getSelection().removeAllRanges();
+        });
+
+        // UI state updater
+        function updateStatusUI(state) {
+            statusPill.className = 'status-pill';
+            
+            if (state === 'listening') {
+                statusPill.classList.add('status-listening');
+                statusText.textContent = 'СТАТУС: СЛУШАЮ 🎤';
+                startBtn.className = 'btn btn-stop';
+                startBtnText.textContent = 'Стоп';
+                startBtn.querySelector('i').textContent = 'stop';
+            } else if (state === 'reconnecting') {
+                statusPill.classList.add('status-reconnecting');
+                statusText.textContent = 'СТАТУС: ПОДКЛЮЧЕНИЕ...';
+                startBtn.className = 'btn btn-stop';
+                startBtnText.textContent = 'Стоп';
+            } else {
+                statusPill.classList.add('status-off');
+                statusText.textContent = 'СТАТУС: ВЫКЛ';
+                startBtn.className = 'btn btn-start';
+                startBtnText.textContent = 'Старт';
+                startBtn.querySelector('i').textContent = 'play_arrow';
+            }
+        }
+
+        // Web Speech API initialization
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'ru-RU';
+
+            recognition.onstart = () => {
+                isListening = true;
+                updateStatusUI('listening');
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                // If it was stopped automatically by silence, and user wants to keep listening, auto-restart
+                if (shouldBeListening) {
+                    updateStatusUI('reconnecting');
+                    setTimeout(() => {
+                        if (shouldBeListening) {
+                            try {
+                                recognition.start();
+                            } catch (e) {
+                                console.error("Error restarting SpeechRecognition:", e);
+                            }
+                        }
+                    }, 400);
+                } else {
+                    updateStatusUI('off');
+                }
+            };
+
+            recognition.onresult = (event) => {
+                interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript + ' ';
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                // Render with editable content and scrolling
+                transcriptDiv.innerHTML = `<span>${finalTranscript}</span><span class="interim-text">${interimTranscript}</span>`;
+                transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+            };
+
+            recognition.onerror = (e) => {
+                console.error("STT Error: ", e.error);
+                if (e.error === 'not-allowed') {
+                    alert("Ошибка: Доступ к микрофону заблокирован. Разрешите его в настройках браузера.");
+                    shouldBeListening = false;
+                    updateStatusUI('off');
+                }
+            };
+        } else {
+            transcriptDiv.innerHTML = `<div class="empty-placeholder">Web Speech API не поддерживается в этом браузере. Пожалуйста, откройте страницу в Google Chrome.</div>`;
+            startBtn.disabled = true;
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (isListening) {
+                shouldBeListening = false;
+                recognition.stop();
+            } else {
+                shouldBeListening = true;
+                recognition.start();
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            if (confirm("Очистить текущий диалог и подсказки?")) {
+                finalTranscript = '';
+                interimTranscript = '';
+                transcriptDiv.innerHTML = '';
+                aiResponseDiv.textContent = 'ИИ готов к работе...';
+            }
+        });
+
+        // Markdown Parser and Renderer helper
+        function renderContent(rawText) {
+            // Check if marked.js is available
+            if (window.marked && typeof window.marked.parse === 'function') {
+                try {
+                    return window.marked.parse(rawText);
+                } catch (e) {
+                    console.error("Marked.js rendering error:", e);
+                }
+            }
+            
+            // Fallback parsing (regex-based)
+            let html = rawText
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            
+            // Go code blocks
+            html = html.replace(/```go\s*([\s\S]*?)```/g, '<pre><code class="language-go">$1</code></pre>');
+            html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bold
+            html = html.replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>');
+            // Headers
+            html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+            // Bullet Lists
+            html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/gim, '<ul>$1</ul>');
+            html = html.replace(/<\/ul>\s*<ul>/g, '');
+            // New lines
+            html = html.replace(/\n/g, '<br>');
+            
+            return html;
+        }
+
+        // Attach copy button handlers to code blocks
+        function attachCodeCopyHandlers() {
+            const preBlocks = aiResponseDiv.querySelectorAll('pre');
+            preBlocks.forEach(pre => {
+                // Check if button already exists
+                if (pre.querySelector('.copy-btn')) return;
+                
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.innerHTML = '<i class="material-icons-round" style="font-size: 13px;">content_copy</i> Copy';
+                
+                btn.addEventListener('click', () => {
+                    const code = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+                    navigator.clipboard.writeText(code).then(() => {
+                        btn.className = 'copy-btn copied';
+                        btn.innerHTML = '<i class="material-icons-round" style="font-size: 13px;">done</i> Copied!';
+                        setTimeout(() => {
+                            btn.className = 'copy-btn';
+                            btn.innerHTML = '<i class="material-icons-round" style="font-size: 13px;">content_copy</i> Copy';
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Error copying code:', err);
+                    });
+                });
+                
+                pre.appendChild(btn);
+            });
+        }
+
+        // Trigger AI analysis
+        async function triggerAI() {
+            const key = keyInput.value.trim();
+            if (!key) {
+                alert("Пожалуйста, укажите Gemini API Key в боковой панели!");
+                return;
+            }
+            
+            // Sync finalTranscript from the contenteditable div in case the user manually modified it!
+            // We strip HTML tags from contenteditable before reading text
+            const editableText = transcriptDiv.innerText.trim();
+            if (!editableText) {
+                aiResponseDiv.innerHTML = '<div style="color: var(--danger);">Диалог пуст. Наговорите или введите текст вручную!</div>';
+                return;
+            }
+
+            aiResponseDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
+                    <i class="material-icons-round" style="animation: spin 1s linear infinite;">sync</i>
+                    Анализирую диалог и генерирую шпаргалку...
+                </div>
+                <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+            `;
+
+            const systemPrompt = promptTextarea.value.trim();
+            const modelName = modelSelect.value;
+            const historyMinutes = parseInt(historySlider.value);
+            
+            // We estimate the amount of context to send based on reading time / word count
+            // Simple slice of the last words representing approximately the selected history duration
+            const words = editableText.split(/\s+/);
+            const wordsPerMinute = 130; // average speaking rate
+            const maxWords = wordsPerMinute * historyMinutes;
+            const contextText = words.length > maxWords ? words.slice(-maxWords).join(' ') : editableText;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+            
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [
+                                { text: systemPrompt },
+                                { text: `Транскрипт разговора:\n${contextText}` }
+                            ]
+                        }]
+                    })
+                });
+
+                const data = await res.json();
+                
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    const rawResponse = data.candidates[0].content.parts[0].text;
+                    aiResponseDiv.innerHTML = renderContent(rawResponse);
+                    attachCodeCopyHandlers();
+                    aiResponseDiv.scrollTop = 0; // scroll to top of suggestion
+                } else if (data.error) {
+                    aiResponseDiv.innerHTML = `<div style="color: var(--danger);">⚠️ Ошибка API: ${data.error.message}</div>`;
+                } else {
+                    aiResponseDiv.innerHTML = `<div style="color: var(--danger);">⚠️ Ошибка обработки. Проверьте валидность API ключа и лимиты.</div>`;
+                    console.log(data);
+                }
+            } catch (err) {
+                aiResponseDiv.innerHTML = `<div style="color: var(--danger);">⚠️ Ошибка сети: ${err.message}</div>`;
+                console.error(err);
+            }
+        }
+
+        askBtn.addEventListener('click', triggerAI);
+
+        // Alt + S / Alt + Ы hotkey handler
+        window.addEventListener('keydown', (e) => {
+            if (e.altKey && (e.key === 's' || e.key === 'ы' || e.key === 'S' || e.key === 'Ы')) {
+                e.preventDefault();
+                triggerAI();
+            }
+        });
+
+        // Let user type manually if they click inside when empty
+        transcriptDiv.addEventListener('focus', () => {
+            if (transcriptDiv.innerText.trim() === 'Нажмите кнопку \'Старт\' и говорите...') {
+                transcriptDiv.innerText = '';
+            }
+        });
+    </script>
+</body>
+</html>

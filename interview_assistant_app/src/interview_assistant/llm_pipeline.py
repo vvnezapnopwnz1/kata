@@ -13,7 +13,7 @@ Format your output EXACTLY as follows:
 **Script:** [A conversational, first-person response ("I would approach this by...", "The main difference is...") designed to be read aloud naturally.]
 """
 
-def generate_interview_response(question_text: str, project_id: str = None, location: str = "us-central1") -> tuple[str, str]:
+def generate_interview_response(question_text: str, project_id: str = None, location: str = "global") -> tuple[str, str]:
     if project_id:
         vertexai.init(project=project_id, location=location)
         
