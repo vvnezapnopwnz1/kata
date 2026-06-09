@@ -6,11 +6,13 @@ import numpy as np
 import pyaudio
 from faster_whisper import WhisperModel
 import litellm
+import argparse
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import pyqtSignal, QObject
 from pynput import keyboard
 from src.interview_assistant.ui_overlay import OverlayWindow
 from src.interview_assistant.audio_buffer import AudioRingBuffer
+from src.interview_assistant.llm_pipeline import LLMPipeline
 
 # Configure logging
 logging.basicConfig(
@@ -31,10 +33,21 @@ class SignalEmitter(QObject):
     update_transcript = pyqtSignal(str)
 
 class Controller:
-    def __init__(self):
+    def __init__(self, args=None):
+        self.args = args if args is not None else argparse.Namespace(
+            backend="direct",
+            project_id="project-7d570aed-312f-4939-9a4",
+            location="eu",
+            data_store_id="",
+            app_id="289f0946-709f-4a80-b7ff-e863aace6bde",
+            version_id="2abf9851-9b93-405d-8420-2f73931def9a",
+            deployment_id="17540902-bba7-4693-b05d-52c77970c493",
+            session_id="aAOXjF"
+        )
         self.is_recording_context = False
         self.emitter = SignalEmitter()
         self.current_transcript = ""
+        self.llm_pipeline = LLMPipeline(self.args)
         
         self.CHUNK = 1024
         self.FORMAT = pyaudio.paFloat32
@@ -279,35 +292,15 @@ class Controller:
             self.emitter.update_status.emit("Ready")
             return
 
-        # 3. Send to LLM (Vertex AI via LiteLLM)
-        self.emitter.update_status.emit("Generating response via Gemini...")
+        # 3. Send to LLM Pipeline (Direct, Search RAG, or Conversational Agent)
+        self.emitter.update_status.emit("Generating response...")
         try:
-            system_prompt = """You are an invisible teleprompter for an interviewee (referred to as [Candidate]) interviewing for a Golang Developer (Middle/Middle+) position.
-All questions must be answered strictly according to the specifications, runtime, and specifications of the Go (Golang) programming language.
-Analyze the transcription of the technical interview conversation containing [Interviewer] and [Candidate] speaker tags.
-Identify the last unanswered technical question asked by [Interviewer]. Ignore questions that [Candidate] has already answered correctly, unless the interviewer asked a follow-up.
-Provide a two-part response. Format your output EXACTLY as follows:
-
-**TL;DR:** [One concise sentence summarizing the core Go-specific answer to the last active question]
-
-**Script:** [A conversational, first-person response ("I would approach this by...", "The main difference is...") designed to be read aloud naturally by the Candidate, using Go-specific terms.]
-"""
-            
-            response = litellm.completion(
-                model="vertex_ai/gemini-2.5-flash",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Interview Transcript:\n{self.current_transcript}"}
-                ],
-                temperature=0.3,
-                stream=True
-            )
+            response_gen = self.llm_pipeline.generate_response(self.current_transcript)
             
             full_text = ""
-            for chunk in response:
-                chunk_text = chunk.choices[0].delta.content
-                if chunk_text:
-                    full_text += chunk_text
+            for chunk in response_gen:
+                if chunk:
+                    full_text += chunk
                     tldr, script = self._parse_incremental(full_text)
                     self.emitter.update_ui.emit(tldr, script)
             
@@ -320,13 +313,34 @@ Provide a two-part response. Format your output EXACTLY as follows:
             self.emitter.update_status.emit("Error")
 
 def main():
-    logger.info("Starting Interview Assistant App (Dual Stream Whisper mode)")
+    parser = argparse.ArgumentParser(description="Go Technical Interview Assistant (Dual Stream Whisper mode)")
+    parser.add_argument("--backend", type=str, choices=["direct", "search", "agent-builder", "dialogflow"], default="direct",
+                        help="LLM backend: 'direct' Gemini completion, 'search' RAG data store search, 'agent-builder' playbook agent, or 'dialogflow' classic agent")
+    parser.add_argument("--project-id", type=str, default="project-7d570aed-312f-4939-9a4",
+                        help="Google Cloud Project ID")
+    parser.add_argument("--location", type=str, default="eu",
+                        help="Google Cloud Region/Location (e.g. eu, global)")
+    parser.add_argument("--data-store-id", type=str, default="",
+                        help="Discovery Engine Data Store ID (for Search-Grounded RAG)")
+    parser.add_argument("--agent-id", type=str, default="",
+                        help="Dialogflow CX Agent ID")
+    parser.add_argument("--app-id", type=str, default="289f0946-709f-4a80-b7ff-e863aace6bde",
+                        help="Agent Builder App ID")
+    parser.add_argument("--version-id", type=str, default="2abf9851-9b93-405d-8420-2f73931def9a",
+                        help="Agent Builder Playbook Version ID")
+    parser.add_argument("--deployment-id", type=str, default="17540902-bba7-4693-b05d-52c77970c493",
+                        help="Agent Builder Playbook Deployment ID")
+    parser.add_argument("--session-id", type=str, default="aAOXjF",
+                        help="Agent Builder Session ID")
+    args, unknown = parser.parse_known_args()
+
+    logger.info(f"Starting Interview Assistant App with backend: {args.backend}")
     app = QApplication(sys.argv)
     
     overlay = OverlayWindow()
     overlay.show()
     
-    controller = Controller()
+    controller = Controller(args)
     controller.emitter.update_ui.connect(overlay.update_text)
     controller.emitter.update_status.connect(overlay.set_status)
     controller.emitter.update_transcript.connect(overlay.set_transcript)

@@ -1,38 +1,42 @@
-import vertexai
-from vertexai.generative_models import GenerativeModel
+import logging
 
-# Initialize vertex ai with default credentials
-# vertexai.init() is expected to be called in main.py or uses ADC
+logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an invisible teleprompter for an interviewee.
-Given the transcription of the interview question, provide a two-part response.
-Format your output EXACTLY as follows:
+# System Prompt for Gemini completions
+SYSTEM_PROMPT = """You are an invisible teleprompter for an interviewee (referred to as [Candidate]) interviewing for a Golang Developer (Middle/Middle+) position.
+All questions must be answered strictly according to the specifications, runtime, and specifications of the Go (Golang) programming language.
+Analyze the transcription of the technical interview conversation containing [Interviewer] and [Candidate] speaker tags.
+Identify the last unanswered technical question asked by [Interviewer]. Ignore questions that [Candidate] has already answered correctly, unless the interviewer asked a follow-up.
+Provide a two-part response. Format your output EXACTLY as follows:
 
-**TL;DR:** [One concise sentence summarizing the core answer]
+**TL;DR:** [One concise sentence summarizing the core Go-specific answer to the last active question]
 
-**Script:** [A conversational, first-person response ("I would approach this by...", "The main difference is...") designed to be read aloud naturally.]
+**Script:** [A conversational, first-person response ("I would approach this by...", "The main difference is...") designed to be read aloud naturally by the Candidate, using Go-specific terms.]
 """
 
-def generate_interview_response(question_text: str, project_id: str = None, location: str = "global") -> tuple[str, str]:
-    if project_id:
-        vertexai.init(project=project_id, location=location)
+class LLMPipeline:
+    def __init__(self, args):
+        self.backend = getattr(args, "backend", "direct")
+        self.args = args
+        self.pipeline = None
         
-    model = GenerativeModel("gemini-2.5-flash", system_instruction=SYSTEM_PROMPT)
-    
-    response = model.generate_content(question_text)
-    text = response.text.strip()
-    
-    # Parse the response
-    tldr = ""
-    script = ""
-    
-    if "**TL;DR:**" in text and "**Script:**" in text:
-        parts = text.split("**Script:**")
-        tldr = parts[0].strip()
-        script = "**Script:**\n" + parts[1].strip()
-    else:
-        # Fallback if format isn't strictly followed
-        tldr = "**TL;DR:** Could not parse strictly."
-        script = f"**Script:**\n{text}"
+        logger.info(f"LLMPipeline routing initialized with backend: {self.backend}")
         
-    return tldr, script
+        if self.backend == "direct":
+            from src.interview_assistant.pipelines.direct_pipeline import DirectPipeline
+            self.pipeline = DirectPipeline(self.args, SYSTEM_PROMPT)
+        elif self.backend == "dialogflow":
+            from src.interview_assistant.pipelines.dialogflow_pipeline import DialogflowPipeline
+            self.pipeline = DialogflowPipeline(self.args, SYSTEM_PROMPT)
+        elif self.backend == "agent-builder":
+            from src.interview_assistant.pipelines.playbook_agent_pipeline import PlaybookAgentPipeline
+            self.pipeline = PlaybookAgentPipeline(self.args, SYSTEM_PROMPT)
+        elif self.backend == "search":
+            from src.interview_assistant.pipelines.search_rag_pipeline import SearchRAGPipeline
+            self.pipeline = SearchRAGPipeline(self.args, SYSTEM_PROMPT)
+        else:
+            raise ValueError(f"Unknown LLM pipeline backend: {self.backend}")
+
+    def generate_response(self, transcript: str):
+        """Routes response generation to the active pipeline instance."""
+        return self.pipeline.generate_response(transcript)
